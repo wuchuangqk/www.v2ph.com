@@ -111,7 +111,7 @@ def log(text):
     log_time = datetime.now().strftime("%H时%M分%S秒")
     print("log: %s %s" % (log_time, text))
     with open(p('../log.txt'), 'a', encoding='utf8') as f:
-        f.write(time + ' ' + text + '\n')
+        f.write(log_time + ' ' + text + '\n')
 
 
 # 检查cookie有效数
@@ -160,7 +160,7 @@ def dl_gallery(url, girl_name, gallery_name):
             log("套图名称：%s已存在，是空文件夹" % girl_name)
         else:
             log("套图名称：%s已下载完成，跳过下载" % girl_name)
-            return
+            # return
     else:
         log("为套图：%s创建文件夹" % girl_name)
         os.mkdir(gallery_fold)
