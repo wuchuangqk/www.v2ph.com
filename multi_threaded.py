@@ -15,7 +15,7 @@ scraper = cloudscraper.create_scraper()
 headers = {
     "Cookie": "",
     # "referer": "https://www.v2ph.com/",
-    # "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36 Edg/115.0.1901.188",
+    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36 Edg/115.0.1901.188",
     # "Accept-Language": "zh-CN,zh;q=0.9",
 }
 # 域名
@@ -23,15 +23,34 @@ host = "https://www.v2ph.com"
 # 下载记录
 download_history = []
 # 模特名称
-girl_name = "喵糖映画"
+girl_name = "杨晨晨"
 # 写真集名称
-gallery_name = "《小黄鸭与白丝》 [喵糖映画] VOL.009 写真集"
+gallery_name = "杨晨晨sugar《高尔夫主题》 [秀人XIUREN] No.1874 写真集"
 # 图集网页地址
-page_url = "https://www.v2ph.com/album/MTCOS-009"
+page_url = "https://www.v2ph.com/album/XIUREN-1874"
 # 图集保存的路径
 gallery_fold = None
 # 图集
 gallery = None
+is_stop = False
+cookies = {}
+
+
+def readCookies():
+    global cookies
+    with open(p("cookie.txt"), "r") as f:
+        text = f.read()
+        items = text.split(";")
+        for item in items:
+            key, value = item.split("=")
+            cookies[key.strip()] = value.strip()
+
+
+def toCookieString(key_list):
+    list = []
+    for key in key_list:
+        list.append(key + "=" + cookies[key])
+    return ";".join(list)
 
 
 def register():
@@ -68,8 +87,8 @@ def register():
 
 def analysis(doc):
     # 请求被检查
-    if doc.select("#cf-wrapper"):
-        log("请求被检查")
+    if doc.select("#challenge-error-text"):
+        log("5秒盾")
         return False
     # 需要登录
     if doc.select(".login-box-msg"):
@@ -124,6 +143,8 @@ def get_link(html):
 
 def download_img_task(link):
     """"""
+    global headers
+    global is_stop
     start_time = time.time()
     try:
         img_path = os.path.join(gallery_fold, link["name"])
@@ -134,10 +155,14 @@ def download_img_task(link):
         # 设置超时时间(6.05=连接超时时间,30=读取超时时间)
         # req = requests.get(link["src"], headers=headers, timeout=(6.05, 30))
         img_headers = {
-            "Cookie": headers["Cookie"],
+            "Cookie": toCookieString(["cf_clearance", "_gid", "_ga", "_ga_170M3FX3HZ"]),
             "Referer": host,
+            "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36 Edg/115.0.1901.188",
         }
         req = scraper.get(link["src"], headers=img_headers)
+        if req.text.startswith("<!DOCTYPE html>"):
+            is_stop = True
+            raise Exception("5秒盾")
         with open(img_path, "wb") as f:
             f.write(req.content)
             # 更新已下载图片数量
@@ -154,7 +179,7 @@ def download_img_task(link):
         )
     except Exception as e:
         print(e)
-        log("<--下载出错，用时%s秒" % (link["name"], round(time.time() - start_time, 3)))
+        log("<--下载出错，用时%s秒" % (round(time.time() - start_time, 3)))
 
 
 def download_img_manager(img_links):
@@ -171,7 +196,8 @@ def download_img_manager(img_links):
     # # 等待所有线程执行完毕
     # concurrent.futures.wait(futures)
     for link in img_links:
-        download_img_task(link)
+        if is_stop == False:
+            download_img_task(link)
 
 
 def download_first_page():
@@ -235,8 +261,10 @@ def start():
     global gallery_fold
     global gallery
 
-    with open(p("cookie.txt"), "r") as f:
-        headers["cookie"] = f.read()
+    # with open(p("cookie.txt"), "r") as f:
+    #     headers["cookie"] = f.read()
+    readCookies()
+    headers["cookie"] = toCookieString(["cf_clearance", "_gid", "_ga", "_ga_170M3FX3HZ",'frontend','frontend-rmu','frontend-rmt'])
     with open(p("download_history.json"), "r", encoding="utf-8") as f:
         download_history = json.load(f)
 
