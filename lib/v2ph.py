@@ -393,7 +393,7 @@ def readLocalData():
     '''
     global download_history
     log("读取下载记录")
-    with open(p("../download_history.json"), "r", encoding="utf-8") as r:
+    with open(p("../download.json"), "r", encoding="utf-8") as r:
         download_history = json.load(r)
         log("下载记录读取完成")
 

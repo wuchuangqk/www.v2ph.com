@@ -25,4 +25,7 @@ def test_html():
 
 
 if __name__ == "__main__":
-    test_img()
+    # test_img()
+    lst = ['s','g','s']
+    for item,index in lst:
+        print(item,index)

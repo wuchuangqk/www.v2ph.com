@@ -9,8 +9,10 @@ import json, os, re
 import cloudscraper
 from lib.util import p, log, now
 import concurrent.futures
+import record
 
 scraper = cloudscraper.create_scraper()
+dl_record = record.Record()
 # scraper = cloudscraper.create_scraper(delay=10)
 headers = {
     "Cookie": "",
@@ -23,11 +25,11 @@ host = "https://www.v2ph.com"
 # 下载记录
 download_history = []
 # 模特名称
-girl_name = "杨晨晨"
+girl_name = "玥儿玥er"
 # 写真集名称
-gallery_name = "杨晨晨sugar《高尔夫主题》 [秀人XIUREN] No.1874 写真集"
+gallery_name = "[XiuRen秀人网] No.7004 玥儿玥er 黑丝美腿"
 # 图集网页地址
-page_url = "https://www.v2ph.com/album/XIUREN-1874"
+page_url = "https://www.v2ph.com/album/XIUREN-7004"
 # 图集保存的路径
 gallery_fold = None
 # 图集
@@ -53,38 +55,6 @@ def toCookieString(key_list):
     return ";".join(list)
 
 
-def register():
-    """登记"""
-    global download_history
-    girl = None
-    gallery = None
-
-    # 检查是否已登记
-    for item in download_history:
-        if item["name"] == girl_name:
-            girl = item
-            break
-
-    # 未登记时，进行登记
-    if girl == None:
-        gallery = {
-            "name": gallery_name,
-            "download_date": now(),
-            "total_count": 0,
-            "download_count": 0,
-        }
-        girl = {"name": girl_name, "download_date": now(), "galleries": [gallery]}
-        download_history.append(girl)
-        with open(p("download_history.json"), "w", encoding="utf-8") as f:
-            json.dump(download_history, f, indent=2, ensure_ascii=False)
-    else:
-        for item in girl["galleries"]:
-            if item["name"] == gallery_name:
-                gallery = item
-                break
-    return (girl, gallery)
-
-
 def analysis(doc):
     # 请求被检查
     if doc.select("#challenge-error-text"):
@@ -99,11 +69,6 @@ def analysis(doc):
         log("访问次数达到上限")
         return False
     return True
-
-
-def save_download_history():
-    with open(p("download_history.json"), "w", encoding="utf-8") as f:
-        json.dump(download_history, f, indent=2, ensure_ascii=False)
 
 
 def download_other_page(url, sort, page_total):
@@ -167,7 +132,7 @@ def download_img_task(link):
             f.write(req.content)
             # 更新已下载图片数量
             gallery["download_count"] = gallery["download_count"] + 1
-            save_download_history()
+            dl_record.save()
         end_time = time.time()
         size = os.path.getsize(img_path) / (1024 * 1024)
         log(
@@ -226,7 +191,7 @@ def download_first_page():
         temp1 = html.select(".main-wrap .pt-2 .row .col-md-6")[0].select("dd")
         img_total = int(re.findall(r"\d+", temp1[len(temp1) - 1].text)[0])
         gallery["total_count"] = img_total
-        save_download_history()
+        dl_record.save()
         # 计算页数
         page_total = int(img_total / 10)
         b = img_total % 10
@@ -263,12 +228,22 @@ def start():
 
     # with open(p("cookie.txt"), "r") as f:
     #     headers["cookie"] = f.read()
-    readCookies()
-    headers["cookie"] = toCookieString(["cf_clearance", "_gid", "_ga", "_ga_170M3FX3HZ",'frontend','frontend-rmu','frontend-rmt'])
-    with open(p("download_history.json"), "r", encoding="utf-8") as f:
-        download_history = json.load(f)
+    # readCookies()
+    # headers["cookie"] = toCookieString(
+    #     [
+    #         "cf_clearance",
+    #         "_gid",
+    #         "_ga",
+    #         "_ga_170M3FX3HZ",
+    #         "frontend",
+    #         "frontend-rmu",
+    #         "frontend-rmt",
+    #     ]
+    # )
+    # with open(p("download.json"), "r", encoding="utf-8") as f:
+    #     download_history = json.load(f)
 
-    girl, gallery = register()
+    girl, gallery = dl_record.register()
     # 检查图集是否已下载完成
     if (not gallery["total_count"] == 0) and gallery["total_count"] == gallery[
         "download_count"
