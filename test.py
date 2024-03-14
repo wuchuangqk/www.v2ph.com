@@ -1,6 +1,6 @@
 import cloudscraper, re
 from bs4 import BeautifulSoup
-
+from account import account_manager
 scraper = cloudscraper.create_scraper(delay=10)
 
 
@@ -25,7 +25,5 @@ def test_html():
 
 
 if __name__ == "__main__":
-    # test_img()
-    lst = ['s','g','s']
-    for item,index in lst:
-        print(item,index)
+    account = account_manager()
+    print(account.cookies)

@@ -1,92 +1,130 @@
-"""
-下载记录
-"""
-
-import json
+from util import log
+from history import Album
+from account import account_manager, to_cookie_string
+from download import dl_html, dl_img
+from tools.util import p
+import re
 import os
+from config import user_agent, save_path, html_cookies_key, img_cookies_key, host
 
-from tools.util import now, p
-from util import log, find
 
-record_path = p("download.json")
-save_path = 'img'
+def save_img(_path, binary):
+    img = p(f"{save_path}/{_path}")
+    with open(img, "wb") as f:
+        f.write(binary)
+    size = os.path.getsize(img) / (1024 * 1024)
+    log(f"图片大小：{round(size, 3)}MB")
 
-class Manager:
-    def __init__(self, model, album):
-        self._model = None
-        self._album = None
-        with open(record_path, "r", encoding="utf-8") as f:
-            self._history = json.load(f)
-        self._create(model, album)
 
-    def _makedir(self, name):
-        fold = p(f'{save_path}/{name}')
-        if not os.path.exists(fold):
-            os.mkdir(fold)
-        
-    def _save_history(self):
-        """写入下载记录"""
-        with open(record_path, "w", encoding="utf-8") as f:
-            json.dump(self._history, f, indent=2, ensure_ascii=False)
+class AlbumDownloader:
+    """基于专辑的下载方式"""
 
-    def _create(self, girl_name, gallery_name):
-        """初始化模特和专辑"""
-        album_template = {
-            "name": gallery_name,
-            "download_date": now(),
-            "finish_date": None,
-            "total_count": 0,
-            "download_count": 0,
-        }
-        self._model = find(self._history, "name", girl_name)
-        if self._model == None:
-            log(f"新建模特：{girl_name}")
-            log(f"新建专辑：《{gallery_name}》")
-            self._album = album_template
-            self._model = {
-                "name": girl_name,
-                "download_date": now(),
-                "galleries": [self._album],
-            }
-            self._history.append(self._model)
-            self._save_history()
-            self._makedir(girl_name)
-            self._makedir(f'{girl_name}/{gallery_name}')
+    def __init__(self, model_name, album_name, url):
+        """
+        :param model_name: 模特
+        :param album_name: 专辑（套图）
+        :param url: 专辑页面地址
+        """
+        self.album = Album(model_name, album_name)
+        if url.find("?hl=zh-Hans") == -1:
+            self.url = url + "?hl=zh-Hans"
         else:
-            self._album = find(self._model["galleries"], "name", gallery_name)
-            if self._album == None:
-                log(f"新建专辑：《{gallery_name}》")
-                self._album = album_template
-                self._model["galleries"].append(self._album)
-                self._save_history()
-                self._makedir(f'{girl_name}/{gallery_name}')
+            self.url = url
+        self.page_index = 1
+        self.page_total = 1
+        self.headers = {
+            "Cookie": "",
+            "user-agent": user_agent,
+            "Sec-Ch-Ua": '"Chromium";v="122", "Not(A:Brand";v="24", "Microsoft Edge";v="122"',
+        }
+        self.img_headers = {
+            "Cookie": "",
+            "Referer": host,
+            "user-agent": user_agent,
+        }
 
-    def save(self, name, binary):
-        img = p(f'{save_path}/{self._model['name']}/{self._album['name']}/{name}')
-        with open(img, "wb") as f:
-            f.write(binary)
-        self._album["download_count"] = self._album["download_count"] + 1
-        if self._album["download_count"] == self._album["total_count"]:
-            self._album["finish_date"] = now()
-        self._save_history()
+    def _set_headers(self):
+        account = account_manager()
+        account.sub_visit_times()
+        self.headers["Cookie"] = to_cookie_string(account.cookies, html_cookies_key)
+        self.img_headers["Cookie"] = to_cookie_string(account.cookies, img_cookies_key)
 
-    def show_status(self):
-        """专辑的下载状态"""
-        is_all_downloaded = self._album["download_count"] == self._album["total_count"]
-        is_download = self._album["total_count"] != 0 and is_all_downloaded
-        status = "已完成" if is_download else "未完成"
-        log(f'进度：{self._album["download_count"]}/{self._album["total_count"]}')
-        log(f"状态：{status}")
-        log(f'下载时间：{self._album["download_date"]}')
-        log(f'完成时间：{self._album["finish_date"]}')
+    def _img_queue(self, html):
+        img_tags = html.select(".photos-list .album-photo img")
+        for i in range(len(img_tags)):
+            img = img_tags[i]
+            cur = (self.page_index - 1) * 10 + i + 1
+            if cur <= self.album.donwload_count:
+                continue
+            log(f"下载进度：{cur}/{self.album.total_count}")
+            name = img["alt"] + ".jpg"
+            binary = dl_img(img["data-src"], self.img_headers)
+            if binary == None:
+                raise Exception("程序终止：下载图片失败")
+            save_img(f"{self.album.model_name}/{self.album.album_name}/{name}", binary)
+            self.album.increment()
 
-    def is_finish(self):
-        """专辑是否已下载完成"""
-        return self._album["finish_date"] != None
+    def _page(self):
+        for i in range(self.page_index, self.page_total + 1):
+            self.page_index = i
+            log(f"页数：{self.page_index}/{self.page_total}")
+            html = dl_html(f"{self.url}&page={self.page_index}", self.headers)
+            if html == None:
+                raise Exception("程序终止：下载页面失败")
+            self._img_queue(html)
 
-    def set_album_total(self, total):
-        self._album['total_count'] = total
-        self._save_history()
-    
-    def get_album_total(self):
-        return self._album['total_count']
+    def _index(self):
+        """从首页开始下载"""
+        log(f"专辑首页")
+        html = dl_html(f"{self.url}&page={self.page_index}", self.headers)
+        if html == None:
+            raise Exception("程序终止：专辑首页获取失败")
+
+        # 提取图片总数
+        temp = html.select(".main-wrap .pt-2 .row .col-md-6")[0].select("dd")
+        img_total = int(re.findall(r"\d+", temp[len(temp) - 1].text)[0])
+        self.album.set_album_total(img_total)
+        self.set_page_total(img_total)
+
+        log(f"图片总数：{img_total}")
+        log(f"页数：{self.page_index}/{self.page_total}")
+        self._img_queue(html)
+
+        if self.page_index < self.page_total:
+            self.page_index += 1
+            self._page()
+
+    def set_page_total(self, img_total):
+        page_total = int(img_total / 10)
+        # 不够一页的要往后补一页
+        if page_total == 0 or img_total % 10 > 0:
+            page_total += 1
+        self.page_total = page_total
+
+    def set_page_index(self, donwload_count):
+        page_index = int(donwload_count / 10)
+        if page_index == 0 or page_index % 10 > 0:
+            page_index += 1
+        self.page_index = page_index
+
+    def start(self):
+        log("————————————————————下载开始————————————————————")
+        self.album.show_status()
+        if self.album.is_finish:
+            log("————————————————————下载结束————————————————————")
+            return
+
+        self._set_headers()
+
+        # 继续下载
+        if self.album.donwload_count > 0:
+            log("继续未完成的下载")
+            # 通过总图片数，计算总页数
+            self.set_page_total(self.album.total_count)
+            # 通过已下载的图片数，计算应该从哪一页开始下
+            self.set_page_index(self.album.donwload_count)
+            self._page()
+        else:
+            # 新的下载
+            self._index()
+        log("————————————————————下载结束————————————————————")
