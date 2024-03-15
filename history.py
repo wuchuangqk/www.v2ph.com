@@ -5,7 +5,7 @@ import os
 from config import save_path
 
 history_list = []
-history_path = p("download.json")
+history_path = p("data/download.json")
 
 
 def create_fold(_path):

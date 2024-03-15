@@ -2,9 +2,9 @@ from tools.util import p, now
 import json
 from util import log, today
 from download import dl_html
-from config import user_agent, html_cookies_key
+from config import user_agent
 
-account_path = p("account.json")
+account_path = p("data/account.json")
 account_list = []
 user_index = 'https://www.v2ph.com/user/index'
 
