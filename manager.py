@@ -25,7 +25,7 @@ class AlbumDownloader:
         :param album_name: 专辑（套图）
         :param url: 专辑页面地址
         """
-        self.album = Album(model_name, album_name)
+        self.album = Album(model_name, album_name, url)
         if url.find("?hl=zh-Hans") == -1:
             self.url = url + "?hl=zh-Hans"
         else:
@@ -49,7 +49,8 @@ class AlbumDownloader:
         self.headers["Cookie"] = to_cookie_string(account.cookies, html_cookies_key)
         self.img_headers["Cookie"] = to_cookie_string(account.cookies, img_cookies_key)
 
-    def _img_queue(self, html):
+    def _dl_page_imgs(self, html):
+        '''下载本页图片'''
         img_tags = html.select(".photos-list .album-photo img")
         for i in range(len(img_tags)):
             img = img_tags[i]
@@ -71,7 +72,7 @@ class AlbumDownloader:
             html = dl_html(f"{self.url}&page={self.page_index}", self.headers)
             if html == None:
                 raise Exception("程序终止：下载页面失败")
-            self._img_queue(html)
+            self._dl_page_imgs(html)
 
     def _index(self):
         """从首页开始下载"""
@@ -88,7 +89,7 @@ class AlbumDownloader:
 
         log(f"图片总数：{img_total}")
         log(f"页数：{self.page_index}/{self.page_total}")
-        self._img_queue(html)
+        self._dl_page_imgs(html)
 
         if self.page_index < self.page_total:
             self.page_index += 1

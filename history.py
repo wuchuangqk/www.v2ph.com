@@ -27,7 +27,7 @@ def save_history():
 
 
 class Album:
-    def __init__(self, model_name, album_name):
+    def __init__(self, model_name, album_name, url):
         self._model = None
         self._album = None
         self.model_name = model_name
@@ -35,13 +35,14 @@ class Album:
         self.is_finish = False
         self.donwload_count = 0
         self.total_count = 0
-        self._create_archive()
+        self._create_archive(url)
 
-    def _create_archive(self):
+    def _create_archive(self, url):
         """初始化模特和专辑"""
         global history_list
         album_template = {
             "name": self.album_name,
+            "url": url,
             "download_date": now(),
             "finish_date": None,
             "total_count": 0,
@@ -54,6 +55,7 @@ class Album:
             self._album = album_template
             self._model = {
                 "name": self.model_name,
+                "homepage": None,
                 "download_date": now(),
                 "galleries": [self._album],
             }
