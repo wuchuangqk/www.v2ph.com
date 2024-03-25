@@ -72,6 +72,7 @@ class Account():
         save_account()
 
 def account_manager() -> Account:
+    account = None
     for item in account_list:
         if item["visit_times"] > 0:
             check_account_times(item)
