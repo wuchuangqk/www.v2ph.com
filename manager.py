@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor
 from util import log
 from history import Album
 from account import account_manager, to_cookie_string
@@ -46,25 +47,35 @@ class AlbumDownloader:
     def _set_headers(self):
         account = account_manager()
         account.sub_visit_times()
-        self.headers["Cookie"] = to_cookie_string(account.cookies, html_cookies_key)
-        self.img_headers["Cookie"] = to_cookie_string(account.cookies, img_cookies_key)
+        self.headers["Cookie"] = to_cookie_string(
+            account.cookies, html_cookies_key)
+        self.img_headers["Cookie"] = to_cookie_string(
+            account.cookies, img_cookies_key)
+
+    def _dl_img_task(self, img, headers):
+        binary = dl_img(img["data-src"], headers)
+        if binary == None:
+            raise Exception("程序终止：下载图片失败")
+        name = img["alt"] + ".jpg"
+        save_img(f"{self.album.model_name}/{self.album.album_name}/{name}", binary)
+        self.album.increment()
 
     def _dl_page_imgs(self, html):
-        '''下载本页图片'''
+        """下载本页图片"""
         img_tags = html.select(".photos-list .album-photo img")
-        for i in range(len(img_tags)):
-            img = img_tags[i]
-            cur = (self.page_index - 1) * 10 + i + 1
-            if cur <= self.album.donwload_count:
-                continue
-            log(f"下载进度：{cur}/{self.album.total_count}")
-            name = img["alt"] + ".jpg"
-            binary = dl_img(img["data-src"], self.img_headers)
-            if binary == None:
-                raise Exception("程序终止：下载图片失败")
-            save_img(f"{self.album.model_name}/{self.album.album_name}/{name}", binary)
-            self.album.increment()
-
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            for i in range(len(img_tags)):
+                img = img_tags[i]
+                # 判断此图片是否已下载
+                name = img["alt"] + ".jpg"
+                img_path = p(f"{save_path}/{self.album.model_name}/{self.album.album_name}/{name}")
+                if os.path.exists(img_path):
+                    continue
+                # i+1是因为i初始值是0，10是一页10张图片
+                cur = (self.page_index - 1) * 10 + (i + 1)
+                log(f"下载进度：{cur}/{self.album.total_count}")
+                # 把下载任务和保存任务提交到线程池
+                executor.submit(self._dl_img_task, img, self.img_headers)
     def _page(self):
         for i in range(self.page_index, self.page_total + 1):
             self.page_index = i
