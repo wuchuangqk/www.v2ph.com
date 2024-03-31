@@ -1,11 +1,11 @@
 from bs4 import BeautifulSoup
 import time
 import cloudscraper
-from util import log
-from tools.util import p
+from util import log, p
 from config import host
+import brotli
 
-scraper = cloudscraper.create_scraper()
+scraper = cloudscraper.create_scraper(delay=10)
 
 
 def _inspect(doc):
@@ -35,7 +35,6 @@ def dl_html(url, headers, debug=False):
             return dl_html(host + res.headers["location"], debug)
         log(f"<--成功，用时{round(time.time() - start_time, 3)}秒")
         res.encoding = "utf-8"
-
         # 将页面保存到本地用于调试
         if debug:
             with open(p("debug.html"), "w", encoding="utf-8") as f:

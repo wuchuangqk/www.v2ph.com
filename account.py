@@ -1,8 +1,8 @@
-from tools.util import p, now
+from util import p
 import json
 from util import log, today
 from download import dl_html
-from config import user_agent
+from config import user_agent, img_cookies_key, sec_ch_ua, host
 
 account_path = p("data/account.json")
 account_list = []
@@ -36,12 +36,19 @@ def check_account_times(account):
     """检查账号当日可用次数"""
     log(f'获取账号：{account['account']}今日可用次数')
     headers = {
-        "Cookie": account["cookie"],
-        "user-agent": user_agent,
-        "Sec-Ch-Ua": '"Chromium";v="122", "Not(A:Brand";v="24", "Microsoft Edge";v="122"',
-        "Origin": "https://www.v2ph.com",
-        "Content-Type": "application/x-www-form-urlencoded",
-        "Referer": "https://www.v2ph.com/user/index?__cf_chl_tk=YuK9srWYxJqZl6exlbimcoqZqgmBUVwk6R35LYtTeAs-1710425425-0.0.1.1-1578"
+        # 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+        # 'Accept-Encoding': 'gzip, deflate, br, zstd',
+        # 'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6',
+        # 'Cache-Control': 'max-age=0',
+        "Cookie": account['cookie'],
+        # "user-agent": user_agent,
+        # "Sec-Ch-Ua": sec_ch_ua,
+        # "Sec-Ch-Ua-Mobile": '?0',
+        # 'Sec-Ch-Ua-Platform': '"Windows"',
+        # 'Sec-Fetch-Dest': 'document',
+        # 'Sec-Fetch-Mode': 'navigate',
+        # 'Sec-Fetch-User': '?1',
+        # 'Upgrade-Insecure-Requests': '1',
     }
     html = dl_html(user_index, headers=headers)
     if html == None:

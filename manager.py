@@ -1,12 +1,12 @@
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor
 from util import log
 from history import Album
 from account import account_manager, to_cookie_string
 from download import dl_html, dl_img
-from tools.util import p
+from util import p
 import re
 import os
-from config import user_agent, save_path, html_cookies_key, img_cookies_key, host
+from config import user_agent, save_path, html_cookies_key, img_cookies_key, host, sec_ch_ua
 
 
 def save_img(_path, binary):
@@ -35,8 +35,8 @@ class AlbumDownloader:
         self.page_total = 1
         self.headers = {
             "Cookie": "",
-            "user-agent": user_agent,
-            "Sec-Ch-Ua": '"Chromium";v="122", "Not(A:Brand";v="24", "Microsoft Edge";v="122"',
+            # "user-agent": user_agent,
+            # "Sec-Ch-Ua": sec_ch_ua,
         }
         self.img_headers = {
             "Cookie": "",
@@ -47,10 +47,8 @@ class AlbumDownloader:
     def _set_headers(self):
         account = account_manager()
         account.sub_visit_times()
-        self.headers["Cookie"] = to_cookie_string(
-            account.cookies, html_cookies_key)
-        self.img_headers["Cookie"] = to_cookie_string(
-            account.cookies, img_cookies_key)
+        self.headers["Cookie"] = to_cookie_string(account.cookies, html_cookies_key)
+        self.img_headers["Cookie"] = to_cookie_string(account.cookies, img_cookies_key)
 
     def _dl_img_task(self, img, headers):
         binary = dl_img(img["data-src"], headers)
@@ -63,6 +61,7 @@ class AlbumDownloader:
     def _dl_page_imgs(self, html):
         """下载本页图片"""
         img_tags = html.select(".photos-list .album-photo img")
+        futures = []
         with ThreadPoolExecutor(max_workers=4) as executor:
             for i in range(len(img_tags)):
                 img = img_tags[i]
@@ -75,7 +74,12 @@ class AlbumDownloader:
                 cur = (self.page_index - 1) * 10 + (i + 1)
                 log(f"下载进度：{cur}/{self.album.total_count}")
                 # 把下载任务和保存任务提交到线程池
-                executor.submit(self._dl_img_task, img, self.img_headers)
+                future = executor.submit(self._dl_img_task, img, self.img_headers)
+                futures.append(future)
+        for future in futures:
+            if future.exception() != None:
+                raise Exception("程序终止：下载图片失败")
+        
     def _page(self):
         for i in range(self.page_index, self.page_total + 1):
             self.page_index = i
@@ -127,7 +131,6 @@ class AlbumDownloader:
             return
 
         self._set_headers()
-
         # 继续下载
         if self.album.donwload_count > 0:
             log("继续未完成的下载")

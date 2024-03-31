@@ -1,5 +1,4 @@
-from tools.util import now, p
-from util import log, find
+from util import log, find, p, now
 import json
 import os
 from config import save_path
